@@ -23,7 +23,7 @@ function createGame() {
 }
 
 function joinGame() {
-    const username = $('#username').val(), lobbyno = $('#lobbyno').val();
+    const username = getUsername(), lobbyno = $('#lobbyno').val();
     if(lobbyno === '') {
         alert('lobby # required');
     } else if(username !== null) {

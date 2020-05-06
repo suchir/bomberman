@@ -45,6 +45,9 @@ class Server {
         this.players.delete(socket.id);
         this.numReady--;
         this.sendLobby();
+        if(this.players.size === 0) {
+            servers.delete(this.id);
+        }
     }
 
     full() {
@@ -83,6 +86,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         if(socketToServer.has(socket.id)) {
             socketToServer.get(socket.id).disconnect(socket);
+            socketToServer.delete(socket.id);
         }
     })
 })
