@@ -81,7 +81,9 @@ io.on('connection', (socket) => {
         }
     })
     socket.on('disconnect', () => {
-        socketToServer.get(socket.id).disconnect(socket);
+        if(socketToServer.has(socket.id)) {
+            socketToServer.get(socket.id).disconnect(socket);
+        }
     })
 })
 
