@@ -5,7 +5,6 @@ function showPage(page) {
     PAGES.forEach(x => $(`#${x}`).hide());
     $(`#${page}`).show();
 }
-showPage('menu');
 
 function getUsername() {
     const username = $('#username').val().substr(0, 10);

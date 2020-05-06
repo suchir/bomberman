@@ -2,22 +2,22 @@
 <html>
     <head>  
         <title> bomberman </title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="/client.js"></script>
     </head>
     <body>
         <h1> bomberman </h1>
-        <div id="menu">
+        <div id="menu" style="display:block">
             <input id="username" type="text" placeholder="username"> <br><br>
             <button onclick="createGame()"> create game </button> <br><br>
             <input id="lobbyno" type="text" placeholder="lobby #">
             <button onclick="joinGame()"> join game </button>
         </div>
-        <div id="lobby">
+        <div id="lobby" style="display:none">
             <h2 id="lobbyname"> lobby </h2>
             <button id="ready" onclick="playerReady()"> ready </button>
             <ul id="playerlist"> </ul>
         </div>
     </body>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/client.js"></script>
 </html>
