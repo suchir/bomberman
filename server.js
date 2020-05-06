@@ -14,44 +14,77 @@ const socketToServer = new Map();
 
 class Server {
     constructor(id) {
+        this.maxPlayers = 4;
+        this.tickInterval = 250;
+
         this.id = id;
         this.players = new Map();
-        this.maxPlayers = 4;
-        this.numReady = 0;
+        this.gameStarted = false;
+        this.gameEnded = false;
     }
 
     sendLobby() {
-        const lobby = {
-            id: this.id,
-            players: Array.from(this.players.values())
+        const usernames = Array.from(this.players.values()).map(x => x.username)
+        let first = true;
+        for(const socketid of this.players.keys()) {
+            io.to(socketid).emit('sendLobby', this.id, usernames, first);
+            first = false;
         }
-        io.to(this.id).emit('sendLobby', lobby);
     }
 
     addPlayer(socket, username) {
         socket.join(this.id);
         socketToServer.set(socket.id, this);
-        this.players.set(socket.id, {username, ready: false});
+        this.players.set(socket.id, {
+            username,
+            action: null,
+            clientTick: null
+        });
         this.sendLobby();
     }
 
-    playerReady(socket) {
-        this.players.get(socket.id).ready = true;
-        this.numReady++;
-        this.sendLobby();
+    startGame() {
+        this.gameStarted = true;
+
+        const usernames = Array.from(this.players.values()).map(x => x.username)
+        let i = 0;
+        for(const socketid of this.players.keys()) {
+            io.to(socketid).emit('startGame', this.id, usernames, i);
+            i++;
+        }
+
+        const loop = setInterval(() => {
+            // TODO: action broadcasting
+
+            if(this.gameEnded) {
+                clearInterval(loop);
+
+                this.players.forEach(v => {
+                    v.action = null;
+                    v.clientTick = null;
+                });
+                this.gameStarted = false;
+                this.gameEnded = false;
+
+                this.sendLobby();
+            }
+        }, this.tickInterval);
+    }
+
+    endGame() {
+        this.gameEnded = true;
     }
 
     disconnect(socket) {
         this.players.delete(socket.id);
-        this.numReady--;
         this.sendLobby();
         if(this.players.size === 0) {
             servers.delete(this.id);
         }
     }
 
-    full() {
-        return this.players.size == this.maxPlayers;
+    isFull() {
+        return this.players.size === this.maxPlayers;
     }
 
     static create() {
@@ -68,20 +101,25 @@ io.on('connection', (socket) => {
         server = Server.create();
         server.addPlayer(socket, username);
     });
-    socket.on('playerReady', () => {
-        socketToServer.get(socket.id).playerReady(socket);
+    socket.on('startGame', () => {
+        socketToServer.get(socket.id).startGame();
     });
     socket.on('joinGame', (username, lobbyno) => {
         if(servers.has(lobbyno)) {
             const server = servers.get(lobbyno);
-            if(server.full()) {
+            if(server.isFull()) {
                 socket.emit('joinFail', 'server is full');
+            } else if(server.gameStarted) {
+                socket.emit('joinFail', 'game already started');
             } else {
                 server.addPlayer(socket, username);
             }
         } else {
             socket.emit('joinFail', 'server not found');
         }
+    })
+    socket.on('endGame', () => {
+        socketToServer.get(socket.id).endGame();
     })
     socket.on('disconnect', () => {
         if(socketToServer.has(socket.id)) {

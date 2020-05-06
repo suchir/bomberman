@@ -19,6 +19,7 @@
   "homepage": "https://github.com/suchir/bomberman#readme",
   "dependencies": {
     "express": "^4.17.1",
+    "lodash": "^4.17.15",
     "socket.io": "^2.3.0"
   }
 }

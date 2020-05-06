@@ -1,8 +1,7 @@
 const socket = io();
 
-PAGES = ['menu', 'lobby']
 function showPage(page) {
-    PAGES.forEach(x => $(`#${x}`).hide());
+    ['#menu', '#lobby', '#game'].forEach(x => $(x).hide());
     $(`#${page}`).show();
 }
 
@@ -31,20 +30,39 @@ function joinGame() {
     }
 }
 
-function playerReady() {
-    $("#ready").prop('disabled', true);
-    socket.emit('playerReady');
+function startGame() {
+    socket.emit('startGame');
 }
 
-socket.on('sendLobby', lobby => {
-    $('#lobbyname').text(`lobby #${lobby.id}`);
+socket.on('sendLobby', (lobbyno, usernames, isHost) => {
+    if(isHost) {
+        $('#startgame').show();
+    } else {
+        $('#startgame').hide();
+    }
+    $('#lobbyname').text(`lobby #${lobbyno}`);
     const playerlist = $('#playerlist');
     playerlist.empty();
-    for(const player of lobby.players) {
-        const text = `${player.username} (${player.ready? 'ready' : 'not ready'})`
-        playerlist.append(`<li> ${text} </li>`)
-    }
+    usernames.forEach((username, i) => {
+        playerlist.append(`<li>${username} ${i == 0? '(host)' : ''}</li>`);
+    });
     showPage('lobby');
 });
 
 socket.on('joinFail', message => alert(message));
+
+const ctx = $('#canvas')[0].getContext('2d');
+
+socket.on('startGame', (seed, usernames, pid) => {
+    // TODO: game logic
+
+    ctx.beginPath();
+    ctx.rect(20, 40, 50, 50);
+    ctx.fillStyle = "#FF0000";
+    ctx.fill();
+    ctx.closePath();
+
+    setTimeout(() => socket.emit('endGame'), 1000);
+
+    showPage('game');
+});
