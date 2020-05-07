@@ -14,7 +14,7 @@ const socketToServer = new Map();
 
 class Server {
     static MAX_PLAYERS = 4;
-    static TICK_INTERVAL = 250;
+    static TICK_INTERVAL = 15;
 
     constructor(id) {
         this.id = id;

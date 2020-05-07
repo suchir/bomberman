@@ -64,16 +64,17 @@ class Renderer {
             ret.set(asset, image);
         });
         return ret;
-    }(['block']);
+    }(['block', 'player0', 'player1', 'player2', 'player3', 'bomb', 'expl',
+       'playerexpl0', 'playerexpl1', 'playerexpl2', 'playerexpl3', 'items']);
 
     static render(asset, sn, sm, si, sj, sh, sw, i, j, h, w) {
-        const image = Renderer.ASSETS.get(asset);
+        const image = this.ASSETS.get(asset);
         sn = Math.round(image.height / sn);
         sm = Math.round(image.width / sm);
-        const n = Math.round(Renderer.CANVAS.height / GameState.HEIGHT);
-        const m =  Math.round(Renderer.CANVAS.width / GameState.WIDTH);
-        Renderer.CTX.drawImage(
-            Renderer.ASSETS.get(asset), 
+        const n = Math.round(this.CANVAS.height / GameState.HEIGHT);
+        const m =  Math.round(this.CANVAS.width / GameState.WIDTH);
+        this.CTX.drawImage(
+            this.ASSETS.get(asset), 
             sj*sm, si*sn, sw*sm, sh*sn,
             Math.round(j*m), Math.round(i*n), Math.round(w*m), Math.round(h*n)
         );
@@ -88,14 +89,47 @@ class Block {
     }
 
     render() {
-        const types = ['border', 'free', 'solid', 'sand'];
-        Renderer.render('block', 1, 4, 0, types.indexOf(this.type), 1, 1, this.i, this.j, 1, 1);
+        const sj = ['border', 'free', 'solid', 'sand'].indexOf(this.type);
+        Renderer.render('block', 1, 4, 0, sj, 1, 1, this.i, this.j, 1, 1);
+    }
+}
+
+class Player {
+    static PACE = 8;
+    static MOVE_ANIM = 16;
+    static DIE_ANIM = 7;
+
+    constructor(i, j, username, pid) {
+        this.i = i;
+        this.j = j;
+        this.username = username;
+        this.pid = pid;
+        this.d = 0;
+        this.fi = 0;
+        this.fj = 0;
+
+        this.moveState = null;
+        this.dieState = null;
+    }
+
+    render() {
+        const asset = `player${this.pid}`;
+        let sj = this.d * 3;
+        if(this.moveState !== null) {
+            const state = Math.floor(4 * this.moveState / Player.MOVE_ANIM);
+            sj += state == 1? 1 : state == 3? 2 : 0;
+        }
+        const i = this.i + this.fi / (2 * Player.PACE),
+              j = this.j + this.fj / (2 * Player.PACE);
+        Renderer.render(asset, 1, 12, 0, sj, 1, 1, i-1, j, 2, 1);
     }
 }
 
 class GameState {
     static HEIGHT = 13;
     static WIDTH = 15;
+    static DELTA = [[1, 0], [0, -1], [0, 1], [-1, 0]];
+    static DIRS = ['down', 'left', 'right', 'up'];
 
     constructor(seed, usernames) {
         const h = GameState.HEIGHT, w = GameState.WIDTH;
@@ -116,6 +150,55 @@ class GameState {
                 this.blocks[i][j] = new Block(i, j, type);
             }
         }
+        const locs = [[1, 1], [h-2, w-2], [h-2, 1], [1, w-2]];
+        this.players = usernames.map((username, i) => {
+            return new Player(locs[i][0], locs[i][1], username, i);
+        });
+
+    }
+
+    step(actions) {
+        this.players.forEach((player, i) => {
+            const d = GameState.DIRS.indexOf(actions[i].dir), space = actions[i].space;
+            if(player.fi != 0 || player.fj != 0) {
+                if(d !== -1 && d === 3-player.d) {
+                    player.d = d;
+                }
+            } else {
+                player.moveState = null;
+                if(d !== -1) {
+                    player.d = d;
+                    const [di, dj] = GameState.DELTA[player.d];
+                    if(this.blocks[player.i+di][player.j+dj].type == 'free') {
+                        player.moveState = 0;
+                    }
+                }
+
+            }
+            if(player.moveState !== null) {
+                const [di, dj] = GameState.DELTA[player.d];
+                player.fi += di;
+                if(player.fi < -Player.PACE) {
+                    player.fi = Player.PACE - 1;
+                    player.i--;
+                } else if(player.fi >= Player.PACE) {
+                    player.fi = -Player.PACE;
+                    player.i++;
+                }
+                player.fj += dj;
+                if(player.fj < -Player.PACE) {
+                    player.fj = Player.PACE - 1;
+                    player.j--;
+                } else if(player.fj >= Player.PACE) {
+                    player.fj = -Player.PACE;
+                    player.j++;
+                }
+                player.moveState++;
+                if(player.moveState === Player.MOVE_ANIM) {
+                    player.moveState = 0;
+                }
+            }
+        });
     }
 
     render() {
@@ -125,31 +208,61 @@ class GameState {
                 this.blocks[i][j].render();
             }
         }
+        this.players.forEach(x => x.render());
     }
 }
 
 class Game {
-    static TICK_INTERVAL = 250;
+    static TICK_INTERVAL = 15;
+    static KEY_TABLE = new Map([
+        [40, 'down'],
+        [83, 'down'],
+        [37, 'left'],
+        [65, 'left'],
+        [39, 'right'],
+        [68, 'right'],
+        [38, 'up'],
+        [87, 'up'],
+        [32, 'space']
+    ])
 
     static start(seed, usernames, pid) {
         this.state = new GameState(seed, usernames);
         this.tickno = 0;
         this.pid = pid;
+        this.action = {dir: null, space: false};
     }
 
     static tick() {
         this.state.render();
-        return [null, null];
+        return [this.action, null];
     }
 
     static receiveActions(actions, tickno) {
-        console.log(actions, tickno);
+        this.state.step(actions);
     }
 
     static isDone() {
         return false;
     }
+
+    static keyListener(event, down) {
+        if(this.KEY_TABLE.has(event.keyCode)) {
+            const key = this.KEY_TABLE.get(event.keyCode);
+            if(key === 'space') {
+                this.action.space = down;
+            } else {
+                if(down) {
+                    this.action.dir = key;
+                } else if(this.action.dir === key) {
+                    this.action.dir = null;
+                }
+            }
+        }
+    }
 }
+document.addEventListener('keydown', x => Game.keyListener(x, true), false);
+document.addEventListener('keyup', x => Game.keyListener(x, false), false);
 
 socket.on('startGame', (seed, usernames, pid) => {
     Game.start(seed, usernames, pid);
