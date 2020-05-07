@@ -53,16 +53,92 @@ socket.on('sendLobby', (lobbyno, usernames, isHost) => {
 
 socket.on('joinFail', message => alert(message));
 
-const ctx = $('#canvas')[0].getContext('2d');
+class Renderer {
+    static CANVAS = $('#canvas')[0]
+    static CTX = $('#canvas')[0].getContext('2d');
+    static ASSETS = function(assets){
+        const ret = new Map();
+        assets.forEach(asset => {
+            const image = new Image();
+            image.src = `/assets/${asset}.png`;
+            ret.set(asset, image);
+        });
+        return ret;
+    }(['block']);
+
+    static render(asset, sn, sm, si, sj, sh, sw, i, j, h, w) {
+        const image = Renderer.ASSETS.get(asset);
+        sn = Math.round(image.height / sn);
+        sm = Math.round(image.width / sm);
+        const n = Math.round(Renderer.CANVAS.height / GameState.HEIGHT);
+        const m =  Math.round(Renderer.CANVAS.width / GameState.WIDTH);
+        Renderer.CTX.drawImage(
+            Renderer.ASSETS.get(asset), 
+            sj*sm, si*sn, sw*sm, sh*sn,
+            Math.round(j*m), Math.round(i*n), Math.round(w*m), Math.round(h*n)
+        );
+    }
+}
+
+class Block {
+    constructor(i, j, type) {
+        this.i = i;
+        this.j = j;
+        this.type = type;
+    }
+
+    render() {
+        const types = ['border', 'free', 'solid', 'sand'];
+        Renderer.render('block', 1, 4, 0, types.indexOf(this.type), 1, 1, this.i, this.j, 1, 1);
+    }
+}
+
+class GameState {
+    static HEIGHT = 13;
+    static WIDTH = 15;
+
+    constructor(seed, usernames) {
+        const h = GameState.HEIGHT, w = GameState.WIDTH;
+        this.blocks = new Array(h);
+        for(let i = 0; i < h; i++) {
+            this.blocks[i] = new Array(w);
+            for(let j = 0; j < w; j++) {
+                let type;
+                if(i == 0 || j == 0 || i == h-1 || j == w-1) {
+                    type = 'border';
+                } else if(i%2 == 0 && j%2 == 0) {
+                    type = 'solid';
+                } else if((i < 3 || i >= h-3) && (j < 3 || j >= w-3)) {
+                    type = 'free';
+                } else {
+                    type = 'sand';
+                }
+                this.blocks[i][j] = new Block(i, j, type);
+            }
+        }
+    }
+
+    render() {
+        const h = GameState.HEIGHT, w = GameState.WIDTH;
+        for(let i = 0; i < h; i++) {
+            for(let j = 0; j < w; j++) {
+                this.blocks[i][j].render();
+            }
+        }
+    }
+}
 
 class Game {
     static TICK_INTERVAL = 250;
 
     static start(seed, usernames, pid) {
-
+        this.state = new GameState(seed, usernames);
+        this.tickno = 0;
+        this.pid = pid;
     }
 
     static tick() {
+        this.state.render();
         return [null, null];
     }
 
@@ -81,7 +157,6 @@ socket.on('startGame', (seed, usernames, pid) => {
         if(Game.isDone()) {
             clearInterval(loop);
             socket.emit('endGame');
-            console.log('end game');
         } else {
             const [action, tickno] = Game.tick(pid);
             socket.emit('sendAction', action, tickno);

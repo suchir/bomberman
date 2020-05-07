@@ -38,7 +38,7 @@ class Server {
         socketToServer.set(socket.id, this);
         this.players.set(socket.id, {
             username,
-            action: null,
+            action: 0,
             tickno: null
         });
         this.numActive++;
@@ -68,12 +68,11 @@ class Server {
                 clearInterval(loop);
 
                 this.players.forEach(v => {
-                    if(v.action === 'disconnect') {
+                    if(v.action === null) {
                         this.players.delete(v);
                     } else {
                         v.action = null;
                         v.tickno = null;
-    
                     }
                 });
                 this.gameStarted = false;
@@ -92,23 +91,20 @@ class Server {
 
     endGame() {
         this.voteEnd++;
-        console.log("vote end" + this.voteEnd);
     }
 
     disconnect(socket) {
         this.numActive--;
         if(this.gameStarted) {
-            this.players.get(socket.id).action = 'disconnect';
+            this.players.get(socket.id).action = null;
             if(this.numActive === 0) {
                 servers.delete(this.id);
-                console.log("deleting " + this.id);
             }
         } else {
             this.players.delete(socket.id);
             this.sendLobby();
             if(this.players.size === 0) {
                 servers.delete(this.id);
-                console.log("deleting " + this.id);
             }
         }
     }
