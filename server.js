@@ -38,7 +38,7 @@ class Server {
         socketToServer.set(socket.id, this);
         this.players.set(socket.id, {
             username,
-            action: 0,
+            action: {dir: null, space: false},
             tickno: null
         });
         this.numActive++;
@@ -71,7 +71,7 @@ class Server {
                     if(v.action === null) {
                         this.players.delete(v);
                     } else {
-                        v.action = null;
+                        v.action = {dir: null, space: false};
                         v.tickno = null;
                     }
                 });
