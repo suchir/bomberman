@@ -9,13 +9,13 @@
         </h1>
         <div id="menu" style="display:block">
             <input id="username" type="text" placeholder="username"> <br><br>
-            <button onclick="createGame()"> create game </button> <br><br>
+            <button onclick="UI.createGame()"> create game </button> <br><br>
             <input id="lobbyno" type="text" placeholder="lobby #">
-            <button onclick="joinGame()"> join game </button>
+            <button onclick="UI.joinGame()"> join game </button>
         </div>
         <div id="lobby" style="display:none">
             <h2 id="lobbyname"> lobby </h2>
-            <button id="startgame" onclick="startGame()"> start game </button>
+            <button id="startgame" onclick="UI.startGame()"> start game </button>
             <ul id="playerlist"> </ul>
         </div>
         <div id="game" stype="display:none">

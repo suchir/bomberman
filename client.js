@@ -1,37 +1,39 @@
 const socket = io();
 
-function showPage(page) {
-    ['#menu', '#lobby', '#game'].forEach(x => $(x).hide());
-    $(`#${page}`).show();
-}
-
-function getUsername() {
-    const username = $('#username').val().substr(0, 10);
-    if(username === '') {
-        alert('username required');
-        return null;
+class UI {
+    static showPage(page) {
+        ['#menu', '#lobby', '#game'].forEach(x => $(x).hide());
+        $(`#${page}`).show();
     }
-    return username;
-}
-
-function createGame() {
-    const username = getUsername();
-    if(username !== null) {
-        socket.emit('createGame', username);
+    
+    static getUsername() {
+        const username = $('#username').val().substr(0, 10);
+        if(username === '') {
+            alert('username required');
+            return null;
+        }
+        return username;
     }
-}
-
-function joinGame() {
-    const username = getUsername(), lobbyno = $('#lobbyno').val();
-    if(lobbyno === '') {
-        alert('lobby # required');
-    } else if(username !== null) {
-        socket.emit('joinGame', username, Number(lobbyno));
+    
+    static createGame() {
+        const username = UI.getUsername();
+        if(username !== null) {
+            socket.emit('createGame', username);
+        }
     }
-}
-
-function startGame() {
-    socket.emit('startGame');
+    
+    static joinGame() {
+        const username = UI.getUsername(), lobbyno = $('#lobbyno').val();
+        if(lobbyno === '') {
+            alert('lobby # required');
+        } else if(username !== null) {
+            socket.emit('joinGame', username, Number(lobbyno));
+        }
+    }
+    
+    static startGame() {
+        socket.emit('startGame');
+    }
 }
 
 socket.on('sendLobby', (lobbyno, usernames, isHost) => {
@@ -46,23 +48,48 @@ socket.on('sendLobby', (lobbyno, usernames, isHost) => {
     usernames.forEach((username, i) => {
         playerlist.append(`<li>${username} ${i == 0? '(host)' : ''}</li>`);
     });
-    showPage('lobby');
+    UI.showPage('lobby');
 });
 
 socket.on('joinFail', message => alert(message));
 
 const ctx = $('#canvas')[0].getContext('2d');
 
+class Game {
+    static TICK_INTERVAL = 250;
+
+    static start(seed, usernames, pid) {
+
+    }
+
+    static tick() {
+        return [null, null];
+    }
+
+    static receiveActions(actions, tickno) {
+        console.log(actions, tickno);
+    }
+
+    static isDone() {
+        return false;
+    }
+}
+
 socket.on('startGame', (seed, usernames, pid) => {
-    // TODO: game logic
-
-    ctx.beginPath();
-    ctx.rect(20, 40, 50, 50);
-    ctx.fillStyle = "#FF0000";
-    ctx.fill();
-    ctx.closePath();
-
-    setTimeout(() => socket.emit('endGame'), 1000);
-
-    showPage('game');
+    Game.start(seed, usernames, pid);
+    const loop = setInterval(() => {
+        if(Game.isDone()) {
+            clearInterval(loop);
+            socket.emit('endGame');
+            console.log('end game');
+        } else {
+            const [action, tickno] = Game.tick(pid);
+            socket.emit('sendAction', action, tickno);
+        }
+    }, Game.TICK_INTERVAL);
+    UI.showPage('game');
 });
+
+socket.on('broadcastActions', (actions, tickno) => {
+    Game.receiveActions(actions, tickno);
+})
