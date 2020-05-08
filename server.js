@@ -147,10 +147,18 @@ io.on('connection', (socket) => {
         }
     });
     socket.on('endGame', () => {
-        socketToServer.get(socket.id).endGame();
+        if(socketToServer.has(socket.id)) {
+            socketToServer.get(socket.id).endGame();
+        } else {
+            console.log('warning: client tried to end game that does not exist');
+        }
     });
     socket.on('sendAction', (action, tickno) => {
-        socketToServer.get(socket.id).sendAction(socket, action, tickno);
+        if(socketToServer.has(socket.id)) {
+            socketToServer.get(socket.id).sendAction(socket, action, tickno);
+        } else {
+            console.log('warning: client tried to send actions to game that does not exist');
+        }
     });
     socket.on('disconnect', () => {
         if(socketToServer.has(socket.id)) {
