@@ -61,30 +61,26 @@ class Server {
 
         const loop = setInterval(() => {
             const actions = Array.from(this.players.values()).map(x => x.action);
-            const TEMP = _.cloneDeep(this.players);
-            setTimeout(() => {
-                for(const [socketid, data] of TEMP) {
-                    io.to(socketid).emit('broadcastActions', actions, data.tickno);
-                }
+            for(const [socketid, data] of this.players) {
+                io.to(socketid).emit('broadcastActions', actions, data.tickno);
+            }
 
-                if(this.voteEnd == this.numActive) {
-                    clearInterval(loop);
-    
-                    this.players.forEach(v => {
-                        if(v.action === null) {
-                            this.players.delete(v);
-                        } else {
-                            v.action = {dir: null, space: false};
-                            v.tickno = null;
-                        }
-                    });
-                    this.gameStarted = false;
-                    this.voteEnd = 0;
-    
-                    this.sendLobby();
-                }    
-            }, 0);
+            if(this.voteEnd == this.numActive) {
+                clearInterval(loop);
 
+                this.players.forEach(v => {
+                    if(v.action === null) {
+                        this.players.delete(v);
+                    } else {
+                        v.action = {dir: null, space: false};
+                        v.tickno = null;
+                    }
+                });
+                this.gameStarted = false;
+                this.voteEnd = 0;
+
+                this.sendLobby();
+            }    
 
         }, Server.TICK_INTERVAL);
     }

@@ -300,17 +300,17 @@ class GameState {
     }
 
     // note: low player has priority. bombs behave as solids only at integer points.
-    step(actions) {
+    step(actions, predict, pid) {
         // handle disconnections
         this.players.forEach((player, i) => {
-            if(!player.killed() && actions[i] === null) {
+            if(!predict && !player.killed() && actions[i] === null) {
                 player.kill();
             }
         })
 
         // player bomb placement
         this.players.forEach((player, i) => {
-            if(player.killed()) {
+            if(player.killed() || (predict && i !== pid)) {
                 return;
             }
             const space = actions[i].space;
@@ -324,6 +324,9 @@ class GameState {
 
         // player movement
         this.players.forEach((player, i) => {
+            if(predict && i !== pid) {
+                return;
+            }
             if(player.killed()) {
                 player.step();
                 return;
@@ -401,7 +404,8 @@ class GameState {
         this.fireset.forEach(fire => {
             if(fire.fireState === 0) {
                 this.players.forEach(player => {
-                    if(fire.i === player.i && fire.j === player.j && !player.killed()) {
+                    if(fire.i === player.i && fire.j === player.j && !player.killed()
+                        && !predict) {
                         player.kill();
                     }
                 })
@@ -450,29 +454,29 @@ class Game {
         this.state = new GameState(seed, usernames);
         this.tickno = 0;
         this.pid = pid;
-        this.action = Game.DEFAULT_ACTION;
+        this.action = _.clone(Game.DEFAULT_ACTION);
         this.actionList = [];
     }
 
     static render() {
         const pred = _.cloneDeep(this.state);
         const actions = (new Array(this.state.players.length)).fill(Game.DEFAULT_ACTION);
-        for(const [_, action] of this.actionList) {
+        for(let [_, action] of this.actionList) {
             actions[this.pid] = action;
-            pred.step(actions);
+            pred.step(actions, true, this.pid);
         }
         pred.render();
     }
 
     static tick() {
-        this.actionList.push([this.tickno, _.cloneDeep(this.action)])
+        this.actionList.push([this.tickno, _.clone(this.action)])
         this.render();
         this.tickno++;
         return [this.action, this.tickno - 1];
     }
 
     static receiveActions(actions, tickno) {
-        this.state.step(actions);
+        this.state.step(actions, false, this.pid);
         let i = 0;
         for(; i < this.actionList.length; i++) {
             if(tickno === null || this.actionList[i][0] > tickno) {
