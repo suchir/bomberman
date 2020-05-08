@@ -259,7 +259,7 @@ class Bomb extends Movable {
 }
 
 class Fire {
-    FIRE_TICKS = 14; // 7N
+    FIRE_TICKS = 21; // 7N
 
     constructor(i, j, d, tail) {
         this.i = i;
@@ -519,7 +519,7 @@ class GameState {
 
         // fire aging / kill players
         this.fireset.forEach(fire => {
-            if(fire.fireState === 0) {
+            if(fire.fireState !== null) {
                 this.players.forEach(player => {
                     if(fire.i === player.i && fire.j === player.j && !player.killed()
                         && !predict && player.vestState === null) {
