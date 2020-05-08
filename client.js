@@ -143,7 +143,10 @@ class Player extends Movable {
     PACE = 8;
     MOVE_TICKS = 16; // 4N
     DYING_TICKS = 28; // 7N
+    VEST_FLICKER_TICKS = 6;
+    VEST_TICKS = 300; // VEST_FLICKER_TICKS*N
     MAX_BOMBS = 5;
+    MAX_FIRE = 6;
 
     constructor(i, j, username, pid) {
         super();
@@ -154,11 +157,12 @@ class Player extends Movable {
         this.d = 0;
         this.fi = 0;
         this.fj = 0;
-        this.numBombs = 5;
-        this.fireRad = 6;
-        this.hasKick = true;
+        this.numBombs = 1;
+        this.fireRad = 1;
+        this.hasKick = false;
 
         this.moveState = null;
+        this.vestState = null;
         this.dyingState = null;
         this.deadState = null;
     }
@@ -170,6 +174,12 @@ class Player extends Movable {
                 this.moveState = 0;
             }
             this.move();
+        }
+        if(this.vestState !== null) {
+            this.vestState++;
+            if(this.vestState === this.VEST_TICKS) {
+                this.vestState = null;
+            }
         }
         if(this.dyingState !== null) {
             this.dyingState++;
@@ -201,12 +211,14 @@ class Player extends Movable {
             Renderer.render(asset, 1, 7, 0, sj, 1, 1, i-0.5, j, 1.5, 1);
         } else {
             const asset = `player${this.pid}`;
+            const si = this.vestState === null? 0 : 
+                       Math.floor(this.vestState / this.VEST_FLICKER_TICKS) % 2
             let sj = this.d * 3;
             if(this.moveState !== null) {
                 const state = Math.floor(4 * this.moveState / this.MOVE_TICKS);
                 sj += state == 1? 1 : state == 3? 2 : 0;
             }
-            Renderer.render(asset, 1, 12, 0, sj, 1, 1, i-0.5, j, 1.5, 1);    
+            Renderer.render(asset, 2, 12, si, sj, 1, 1, i-0.5, j, 1.5, 1);    
         }
     }
 }
@@ -280,18 +292,52 @@ class Fire {
     }
 }
 
+// TODO: animate
+class Item {
+    ITEM_TICKS = 64;
+
+    constructor(i, j, type) {
+        this.i = i;
+        this.j = j;
+        this.type = type;
+
+        this.itemState = 0;
+    }
+
+    step() {
+        this.itemState++;
+        if(this.itemState == this.ITEM_TICKS) {
+            this.itemState = 0;
+        }
+    }
+
+    render() {
+        const d = Math.sin(2*Math.PI*this.itemState/this.ITEM_TICKS);
+        const sj = ['fire', 'bomb', 'maxfire', 'vest', 'kick'].indexOf(this.type);
+        Renderer.render('items', 1, 5, 0, sj, 1, 1, this.i+0.25+0.125*d, this.j+0.25, 0.5, 0.5);
+    }
+}
+
 class GameState {
     static HEIGHT = 13;
     static WIDTH = 15;
     static DELTA = [[1, 0], [0, -1], [0, 1], [-1, 0]];
     static DIRS = ['down', 'left', 'right', 'up'];
+    static ITEMS = [[0.5, null], [0.65, 'bomb'], [0.8, 'fire'], [0.875, 'maxfire'],
+                    [0.95, 'kick'], [1.0, 'vest']].reverse();
 
     constructor(seed, usernames) {
+        function rng() {
+            const x = Math.sin(seed++) * 10000;
+            return x - Math.floor(x);        
+        }
+
         const h = GameState.HEIGHT, w = GameState.WIDTH;
         this.blocks = new Array(h);
-        this.bombs = new Array(h);
+        this.items = new Array(h);
         for(let i = 0; i < h; i++) {
             this.blocks[i] = new Array(w);
+            this.items[i] = new Array(h);
             for(let j = 0; j < w; j++) {
                 let type;
                 if(i == 0 || j == 0 || i == h-1 || j == w-1) {
@@ -304,6 +350,18 @@ class GameState {
                     type = 'sand';
                 }
                 this.blocks[i][j] = new Block(i, j, type);
+                if(type === 'sand') {
+                    const x = rng();
+                    let itemtype;
+                    for(const [y, item] of GameState.ITEMS) {
+                        if(x < y) {
+                            itemtype = item;
+                        }
+                    }
+                    this.items[i][j] = new Item(i, j, itemtype);
+                } else {
+                    this.items[i][j] = null;
+                }
             }
         }
         const locs = [[1, 1], [h-2, w-2], [h-2, 1], [1, w-2]];
@@ -318,7 +376,6 @@ class GameState {
         return [...this.bombset].filter(bomb => bomb.i == i && bomb.j == j);
     }
 
-    // note: low player has priority. bombs behave as solids only at integer points.
     step(actions, predict, pid) {
         // handle disconnections
         this.players.forEach((player, i) => {
@@ -326,6 +383,42 @@ class GameState {
                 player.kill();
             }
         })
+
+        // handle items
+        this.players.forEach((player, i) => {
+            if(predict || player.killed()) {
+                return;
+            }
+            const item = this.items[player.i][player.j];
+            if(item === null) {
+                return;
+            }
+            switch(item.type) {
+                case 'fire':
+                    player.fireRad = Math.min(player.fireRad + 1, player.MAX_FIRE);
+                    break;
+                case 'bomb':
+                    player.numBombs = Math.min(player.numBombs + 1, player.MAX_BOMBS);
+                    break;
+                case 'maxfire':
+                    player.fireRad = player.MAX_FIRE;
+                    break;
+                case 'vest':
+                    player.vestState = 0;
+                    break;
+                case 'kick':
+                    player.hasKick = true;
+                    break;
+            }
+            this.items[player.i][player.j] = null;
+        })
+        for(let i = 0; i < GameState.HEIGHT; i++) {
+            for(let j = 0; j < GameState.WIDTH; j++) {
+                if(this.items[i][j] !== null) {
+                    this.items[i][j].step();
+                }
+            }
+        }
 
         // player bomb placement
         this.players.forEach((player, i) => {
@@ -341,7 +434,7 @@ class GameState {
             }
         });
 
-        // player movement
+        // player movement / kick
         this.players.forEach((player, i) => {
             if(predict && i !== pid) {
                 return;
@@ -363,13 +456,17 @@ class GameState {
                     const i = player.i, j = player.j;
                     const [di, dj] = GameState.DELTA[player.d];
                     if(this.blocks[i+di][j+dj].type === 'free') {
-                        player.moveState = 0;
                         const adjBombs = this.bombsAt(i+di, j+dj);
                         if(adjBombs.length) {
-                            if(player.hasKick && this.blocks[i+2*di][j+2*dj].type === 'free' &&
-                               !this.bombsAt(i+2*di, j+2*dj).length) {
-                                adjBombs.forEach(bomb => bomb.d = d);
+                            if(player.hasKick){
+                                if(this.blocks[i+2*di][j+2*dj].type === 'free' &&
+                                   !this.bombsAt(i+2*di, j+2*dj).length) {
+                                    player.moveState = 0;
+                                    adjBombs.forEach(bomb => bomb.d = d);
+                                }
                             }
+                        } else {
+                            player.moveState = 0;
                         }
                     }
                 }
@@ -420,11 +517,12 @@ class GameState {
             }
         });
 
+        // fire aging / kill players
         this.fireset.forEach(fire => {
             if(fire.fireState === 0) {
                 this.players.forEach(player => {
                     if(fire.i === player.i && fire.j === player.j && !player.killed()
-                        && !predict) {
+                        && !predict && player.vestState === null) {
                         player.kill();
                     }
                 })
@@ -445,7 +543,16 @@ class GameState {
         const h = GameState.HEIGHT, w = GameState.WIDTH;
         for(let i = 0; i < h; i++) {
             for(let j = 0; j < w; j++) {
-                this.blocks[i][j].render();
+                const block = this.blocks[i][j], item = this.items[i][j];
+                if(block.type !== 'sand') {
+                    block.render();
+                }
+                if(item !== null) {
+                    item.render();
+                }
+                if(block.type === 'sand') {
+                    block.render();
+                }
             }
         }
         this.fireset.forEach(x => x.render());
@@ -469,12 +576,12 @@ class Game {
         [32, 'space']
     ])
     static DEFAULT_ACTION = {dir: null, space: false};
-
+    static action = _.clone(Game.DEFAULT_ACTION);
+    
     static start(seed, usernames, pid) {
         this.state = new GameState(seed, usernames);
         this.tickno = 0;
         this.pid = pid;
-        this.action = _.clone(Game.DEFAULT_ACTION);
         this.actionList = [];
         this.ping = 0;
     }
