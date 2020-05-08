@@ -437,6 +437,7 @@ class GameState {
 
 class Game {
     static TICK_INTERVAL = 15;
+    static EMA_ALPHA = 15/1000;
     static KEY_TABLE = new Map([
         [40, 'down'],
         [83, 'down'],
@@ -456,6 +457,7 @@ class Game {
         this.pid = pid;
         this.action = _.clone(Game.DEFAULT_ACTION);
         this.actionList = [];
+        this.ping = 0;
     }
 
     static render() {
@@ -466,10 +468,13 @@ class Game {
             pred.step(actions, true, this.pid);
         }
         pred.render();
+        $('#ping').text(`ping: ${Math.floor(this.ping)}`)
     }
 
     static tick() {
         this.actionList.push([this.tickno, _.clone(this.action)])
+        const lag = this.actionList.length*this.TICK_INTERVAL
+        this.ping = this.EMA_ALPHA*lag + (1-this.EMA_ALPHA)*this.ping;
         this.render();
         this.tickno++;
         return [this.action, this.tickno - 1];
