@@ -123,7 +123,7 @@ class Movable {
 class Player extends Movable {
     PACE = 8;
     MOVE_TICKS = 16; // 4N
-    DYING_TICKS = 14; // 7N
+    DYING_TICKS = 28; // 7N
     MAX_BOMBS = 5;
 
     constructor(i, j, username, pid) {
@@ -273,7 +273,6 @@ class GameState {
         this.bombs = new Array(h);
         for(let i = 0; i < h; i++) {
             this.blocks[i] = new Array(w);
-            this.bombs[i] = new Array(w);
             for(let j = 0; j < w; j++) {
                 let type;
                 if(i == 0 || j == 0 || i == h-1 || j == w-1) {
@@ -286,7 +285,6 @@ class GameState {
                     type = 'sand';
                 }
                 this.blocks[i][j] = new Block(i, j, type);
-                this.bombs[i][j] = new Set();
             }
         }
         const locs = [[1, 1], [h-2, w-2], [h-2, 1], [1, w-2]];
@@ -297,10 +295,11 @@ class GameState {
         this.fireset = new Set();
     }
 
-    /*
-        note: low player has priority. bombs behave as solids only at integer points.
-        if bombs are kicked to same integer point at exact same time, only one will be "solid".
-    */
+    bombsAt(i, j) {
+        return [...this.bombset].filter(bomb => bomb.i == i && bomb.j == j);
+    }
+
+    // note: low player has priority. bombs behave as solids only at integer points.
     step(actions) {
         // handle disconnections
         this.players.forEach((player, i) => {
@@ -316,9 +315,8 @@ class GameState {
             }
             const space = actions[i].space;
             const pi = player.i, pj = player.j;
-            if(space && player.numBombs && this.bombs[pi][pj].size === 0) {
+            if(space && player.numBombs && !this.bombsAt(pi, pj).length) {
                 const bomb = new Bomb(pi, pj, player.fireRad, i);
-                this.bombs[pi][pj].add(bomb);
                 this.bombset.add(bomb);
                 player.numBombs--;
             }
@@ -344,11 +342,12 @@ class GameState {
                     const [di, dj] = GameState.DELTA[player.d];
                     if(this.blocks[i+di][j+dj].type === 'free') {
                         player.moveState = 0;
-                        if(this.bombs[i+di][j+dj].size) {
+                        const adjBombs = this.bombsAt(i+di, j+dj);
+                        if(adjBombs.length) {
                             if(player.hasKick && this.blocks[i+2*di][j+2*dj].type === 'free' &&
-                               this.bombs[i+2*di][j+2*dj].size === 0) {
-                                   this.bombs[i+di][j+dj].forEach(bomb => bomb.d = d);
-                               }
+                               !this.bombsAt(i+2*di, j+2*dj).length) {
+                                adjBombs.forEach(bomb => bomb.d = d);
+                            }
                         }
                     }
                 }
@@ -361,10 +360,9 @@ class GameState {
             let i = bomb.i, j = bomb.j;
             
             if(bomb.onGrid()) {
-                this.bombs[i][j].delete(bomb);
                 if(bomb.d !== null) {
                     const [di, dj] = GameState.DELTA[bomb.d];
-                    if(this.blocks[i+di][j+dj].type !== 'free' || this.bombs[i+di][j+dj].size) {
+                    if(this.blocks[i+di][j+dj].type !== 'free' || this.bombsAt(i+di, j+dj).length) {
                         bomb.d = null;
                     }    
                 }
@@ -382,7 +380,7 @@ class GameState {
                     for(k = 0; k <= bomb.fireRad; k++) {
                         const ii = i+k*di, jj = j+k*dj;
                         lastBlock = this.blocks[ii][jj]
-                        if(lastBlock.type !== 'free' || this.bombs[ii][jj].size) {
+                        if(lastBlock.type !== 'free' || this.bombsAt(ii, jj).length) {
                             break;
                         }
                     }
@@ -397,8 +395,6 @@ class GameState {
 
                 const p = this.players[bomb.pid];
                 p.numBombs = Math.min(p.MAX_BOMBS, p.numBombs + 1);
-            } else if(bomb.onGrid()) {
-                this.bombs[i][j].add(bomb);
             }
         });
 
@@ -448,21 +444,43 @@ class Game {
         [87, 'up'],
         [32, 'space']
     ])
+    static DEFAULT_ACTION = {dir: null, space: false};
 
     static start(seed, usernames, pid) {
         this.state = new GameState(seed, usernames);
         this.tickno = 0;
         this.pid = pid;
-        this.action = {dir: null, space: false};
+        this.action = Game.DEFAULT_ACTION;
+        this.actionList = [];
+    }
+
+    static render() {
+        const pred = _.cloneDeep(this.state);
+        const actions = (new Array(this.state.players.length)).fill(Game.DEFAULT_ACTION);
+        for(const [_, action] of this.actionList) {
+            actions[this.pid] = action;
+            pred.step(actions);
+        }
+        pred.render();
     }
 
     static tick() {
-        this.state.render();
-        return [this.action, null];
+        this.actionList.push([this.tickno, _.cloneDeep(this.action)])
+        this.render();
+        this.tickno++;
+        return [this.action, this.tickno - 1];
     }
 
     static receiveActions(actions, tickno) {
         this.state.step(actions);
+        let i = 0;
+        for(; i < this.actionList.length; i++) {
+            if(tickno === null || this.actionList[i][0] > tickno) {
+                break;
+            }
+        }
+        this.actionList = this.actionList.slice(i);
+        this.render();
     }
 
     static isDone() {
