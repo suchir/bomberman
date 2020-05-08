@@ -68,9 +68,9 @@ class Server {
             if(this.voteEnd == this.numActive) {
                 clearInterval(loop);
 
-                this.players.forEach(v => {
+                this.players.forEach((v, k) => {
                     if(v.action === null) {
-                        this.players.delete(v);
+                        this.players.delete(k);
                     } else {
                         v.action = {dir: null, space: false};
                         v.tickno = null;

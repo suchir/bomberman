@@ -1,13 +1,15 @@
 const socket = io();
 
 class UI {
+    static USERNAME_LEN = 10;
+
     static showPage(page) {
         ['#menu', '#lobby', '#game'].forEach(x => $(x).hide());
         $(`#${page}`).show();
     }
     
     static getUsername() {
-        const username = $('#username').val().substr(0, 10);
+        const username = $('#username').val().substr(0, this.USERNAME_LEN);
         if(username === '') {
             alert('username required');
             return null;
@@ -36,7 +38,24 @@ class UI {
     }
 }
 
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    if(!params.has('game')) {
+        return;
+    }
+    let username = "";
+    while(username === "") {
+        username = window.prompt('enter username');
+        if(username === null) {
+            return;
+        }
+        username = username.substr(0, UI.USERNAME_LEN);
+    }
+    socket.emit('joinGame', username, Number(params.get('game')));
+})();
+
 socket.on('sendLobby', (lobbyno, usernames, isHost) => {
+    window.history.pushState(null, null, `/?game=${lobbyno}`)
     if(isHost) {
         $('#startgame').show();
     } else {
