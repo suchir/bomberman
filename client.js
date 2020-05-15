@@ -313,7 +313,7 @@ class Item {
 
     render() {
         const d = Math.sin(2*Math.PI*this.itemState/this.ITEM_TICKS);
-        const sj = ['fire', 'bomb', 'maxfire', 'vest', 'kick'].indexOf(this.type);
+        const sj = ['fire', 'bomb', 'maxfire', 'kick', 'vest'].indexOf(this.type);
         Renderer.render('items', 1, 5, 0, sj, 1, 1, this.i+0.25+0.125*d, this.j+0.25, 0.5, 0.5);
     }
 }

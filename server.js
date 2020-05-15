@@ -52,10 +52,11 @@ class Server {
         }
         this.gameStarted = true;
 
-        const usernames = Array.from(this.players.values()).map(x => x.username)
+        const usernames = Array.from(this.players.values()).map(x => x.username);
+        const seed = Math.random();
         let i = 0;
         for(const socketid of this.players.keys()) {
-            io.to(socketid).emit('startGame', this.id, usernames, i);
+            io.to(socketid).emit('startGame', seed, usernames, i);
             i++;
         }
 
